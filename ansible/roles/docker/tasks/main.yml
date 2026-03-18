@@ -1,0 +1,35 @@
+---
+# roles/docker/tasks/main.yml
+# Installs Docker Engine using OS-specific tasks.
+# After install, the shared configuration steps run on all OSes.
+
+- name: Include OS-specific Docker install tasks
+  include_tasks: "{{ ansible_os_family | lower }}.yml"
+
+# --- Shared post-install config (runs on all OSes) ---
+
+- name: Add current user to docker group
+  # Lets us run docker without sudo.
+  # Important: this takes effect on NEXT login — in CI use `newgrp docker`
+  user:
+    name: "{{ ansible_user_id }}"
+    groups: docker
+    append: yes
+  become: yes
+
+- name: Enable and start Docker service
+  systemd:
+    name: docker
+    enabled: yes
+    state: started
+  become: yes
+  notify: restart docker
+
+- name: Verify Docker works
+  command: docker --version
+  register: docker_ver
+  changed_when: false
+
+- name: Show Docker version
+  debug:
+    msg: "{{ docker_ver.stdout }}"

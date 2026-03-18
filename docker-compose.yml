@@ -1,0 +1,138 @@
+# version: '3.9'
+
+# Key ideas:
+#   - Each service has its own isolated Postgres database (microservices pattern)
+#   - Services communicate using Docker's internal DNS (service names as hostnames)
+#   - Volumes persist DB data between container restarts
+#   - depends_on + healthcheck ensures DBs are ready before services start
+
+networks:
+  shopflow-net:
+    driver: bridge
+
+volumes:
+  auth-db-data:
+  products-db-data:
+  orders-db-data:
+
+services:
+
+  # ─── Auth Service ──────────────────────────────────────────────
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"        
+    environment:
+      PORT: 3001
+      DB_HOST: auth-db
+      DB_PORT: 5432
+      DB_NAME: authdb
+      DB_USER: authuser
+      DB_PASSWORD: authpassword
+      JWT_SECRET: local_dev_secret_change_in_production
+    depends_on:
+      auth-db:
+        condition: service_healthy  # wait until Postgres is accepting connections
+    networks:
+      - shopflow-net
+    restart: unless-stopped
+
+  auth-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: authdb
+      POSTGRES_USER: authuser
+      POSTGRES_PASSWORD: authpassword
+    volumes:
+      - auth-db-data:/var/lib/postgresql/data
+    networks:
+      - shopflow-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U authuser -d authdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─── Products Service ───────────────────────────────────────────
+  products-service:
+    build:
+      context: ./products-service
+      dockerfile: Dockerfile
+    ports:
+      - "3002:3002"
+    environment:
+      PORT: 3002
+      DB_HOST: products-db
+      DB_PORT: 5432
+      DB_NAME: productsdb
+      DB_USER: productsuser
+      DB_PASSWORD: productspassword
+      JWT_SECRET: local_dev_secret_change_in_production
+    depends_on:
+      products-db:
+        condition: service_healthy
+    networks:
+      - shopflow-net
+    restart: unless-stopped
+
+  products-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: productsdb
+      POSTGRES_USER: productsuser
+      POSTGRES_PASSWORD: productspassword
+    volumes:
+      - products-db-data:/var/lib/postgresql/data
+    networks:
+      - shopflow-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U productsuser -d productsdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─── Orders Service ─────────────────────────────────────────────
+  orders-service:
+    build:
+      context: ./orders-service
+      dockerfile: Dockerfile
+    ports:
+      - "3003:3003"
+    environment:
+      PORT: 3003
+      DB_HOST: orders-db
+      DB_PORT: 5432
+      DB_NAME: ordersdb
+      DB_USER: ordersuser
+      DB_PASSWORD: orderspassword
+      JWT_SECRET: local_dev_secret_change_in_production
+      # Docker Compose DNS: service name resolves automatically within shopflow-net
+      PRODUCTS_SERVICE_URL: http://products-service:3002
+    depends_on:
+      orders-db:
+        condition: service_healthy
+      products-service:
+        condition: service_started
+      auth-service:
+        condition: service_started
+    networks:
+      - shopflow-net
+    restart: unless-stopped
+
+  orders-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ordersdb
+      POSTGRES_USER: ordersuser
+      POSTGRES_PASSWORD: orderspassword
+    volumes:
+      - orders-db-data:/var/lib/postgresql/data
+    networks:
+      - shopflow-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ordersuser -d ordersdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5

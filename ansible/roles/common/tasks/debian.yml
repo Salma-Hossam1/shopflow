@@ -1,0 +1,25 @@
+---
+# roles/common/tasks/debian.yml
+# Called automatically when ansible_os_family == "Debian"
+# Covers: Ubuntu, Debian, Linux Mint, Pop!_OS, etc.
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+  become: yes
+
+- name: Install base packages (Debian/Ubuntu)
+  apt:
+    name:
+      - curl
+      - wget
+      - git
+      - apt-transport-https
+      - ca-certificates
+      - gnupg
+      - lsb-release
+      - software-properties-common
+      - python3-pip
+    state: present
+  become: yes

@@ -1,0 +1,55 @@
+---
+# deploy.yml — Deploy-only playbook.
+# Assumes the machine is already provisioned (Docker + Minikube running).
+# Jenkins calls this after building and pushing new Docker images.
+#
+# Usage:
+#   ansible-playbook deploy.yml \
+#     --extra-vars "shopflow_image_tag=${GIT_COMMIT} docker_hub_username=${DOCKER_USER}"
+#
+# Why separate from site.yml?
+#   site.yml runs ALL roles including common/docker/minikube setup — slow.
+#   deploy.yml skips provisioning and only updates the running app.
+#   CI/CD pipelines should be fast — this typically runs in under 2 minutes.
+
+- name: Deploy ShopFlow to existing cluster
+  hosts: k8s_nodes
+  become: false
+
+  pre_tasks:
+    - name: Verify cluster is reachable
+      command: kubectl cluster-info
+      changed_when: false
+      register: cluster_check
+      failed_when: cluster_check.rc != 0
+
+    - name: Show what we are deploying
+      debug:
+        msg: "Deploying {{ docker_hub_username }}/shopflow:{{ shopflow_image_tag }}"
+
+  roles:
+    - role: shopflow
+
+  post_tasks:
+    - name: Check all pods are Running
+      shell: |
+        NOT_RUNNING=$(kubectl get pods --namespace=shopflow-dev \
+          --field-selector=status.phase!=Running \
+          --no-headers 2>/dev/null | wc -l)
+        echo $NOT_RUNNING
+      register: not_running_count
+      changed_when: false
+
+    - name: Fail if any pods are not Running
+      fail:
+        msg: "Some pods are not Running — run: kubectl describe pod -n shopflow-dev"
+      when: not_running_count.stdout | int > 0
+
+    - name: Show final pod status
+      command: kubectl get pods --namespace=shopflow-dev -o wide
+      register: pods
+      changed_when: false
+
+    - name: Print pods
+      debug:
+        msg: "{{ pods.stdout_lines }}"

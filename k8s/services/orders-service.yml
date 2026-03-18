@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders-service-deployment
+  namespace: shopflow-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: orders-service
+  template:
+    metadata:
+      labels:
+        app: orders-service
+    spec:
+      serviceAccountName: orders-service-sa
+      nodeSelector:
+        shopflow/role: storage
+
+      securityContext:        # pod level — who runs the pod
+        runAsNonRoot: true    # reject if image tries to run as root
+        runAsUser: 1000       # force UID 1000 (matches appuser in Dockerfile)
+        fsGroup: 2000         # volume files owned by group 2000
+
+      containers:
+        - name: orders-service
+          image: salmahossam12/shopflow-orders-service:latest
+          ports:
+            - containerPort: 3003
+
+          securityContext:                   # container level — how it runs
+            allowPrivilegeEscalation: false  # can't gain more privileges
+            readOnlyRootFilesystem: true     # filesystem is read-only
+            capabilities:                   # capabilities only at container level
+              drop:
+                - ALL                       # drop every linux capability
+
+          env:
+            - name: PORT
+              value: "3003"
+            - name: DB_HOST
+              value: "orders-db"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              value: "ordersdb"
+            - name: DB_USER
+              value: "ordersuser"
+            - name: PRODUCTS_SERVICE_URL
+              value: "http://products-service:3002"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: jwt-secret
+                  key: JWT_SECRET
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: orders-db-secret
+                  key: POSTGRES_PASSWORD
+          resources:
+            requests:
+              memory: 64Mi   
+              cpu: 50m
+            limits:
+              memory: 128Mi   
+              cpu: 100m
+          volumeMounts:
+            - name: tmp-volume
+              mountPath: /tmp   # writable exception for Node.js temp files
+
+      volumes:
+        - name: tmp-volume
+          emptyDir: {}          # temporary, deleted when pod stops
+---
+apiVersion: v1
+kind: Service   
+metadata:
+  name: orders-service
+  namespace: shopflow-dev
+spec:
+  type: ClusterIP
+  selector:
+    app: orders-service 
+  ports:
+    - port: 3003
+      targetPort: 3003

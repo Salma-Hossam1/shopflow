@@ -1,0 +1,59 @@
+---
+# roles/common/tasks/main.yml
+# Base system configuration.
+# Uses ansible_os_family to handle Debian/Ubuntu vs RedHat/CentOS vs Arch.
+# ansible_os_family is auto-detected by Ansible — no manual config needed.
+
+- name: Include OS-specific package tasks
+  include_tasks: "{{ ansible_os_family | lower }}.yml"
+
+# These tasks below are OS-independent — they work everywhere
+
+- name: Disable swap immediately
+  # K8s requires swap off — with swap on, K8s memory limits don't work correctly
+  command: swapoff -a
+  become: yes
+  changed_when: false
+  ignore_errors: yes   # some environments (WSL2, cloud VMs) have no swap — that's fine
+
+- name: Disable swap permanently in /etc/fstab
+  replace:
+    path: /etc/fstab
+    regexp: '^([^#].*\sswap\s.*)$'
+    replace: '# \1'
+  become: yes
+  ignore_errors: yes   # fstab may not have a swap line at all
+
+- name: Load required kernel modules
+  modprobe:
+    name: "{{ item }}"
+    state: present
+  become: yes
+  loop:
+    - overlay      # needed by container runtimes for layered filesystems
+    - br_netfilter # needed for K8s pod-to-pod networking across nodes
+  ignore_errors: yes
+
+- name: Persist kernel modules across reboots
+  copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: |
+      overlay
+      br_netfilter
+  become: yes
+  ignore_errors: yes
+
+- name: Set kernel networking parameters for K8s
+  # These allow iptables to see bridged traffic — required for K8s networking
+  sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+    sysctl_set: yes
+    reload: yes
+  become: yes
+  loop:
+    - { key: "net.bridge.bridge-nf-call-iptables",  value: "1" }
+    - { key: "net.bridge.bridge-nf-call-ip6tables", value: "1" }
+    - { key: "net.ipv4.ip_forward",                 value: "1" }
+  ignore_errors: yes

@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: orders-pv
+spec:
+  capacity:
+    storage: 512Mi
+  accessModes:
+    - ReadWriteOnce         
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  hostPath:
+    path: /data/shopflow/orders-db  
+     
+  nodeAffinity:
+      required:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: shopflow/role
+                operator: In
+                values:
+                  - storage 
+
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: orders-pvc
+  namespace: shopflow-dev 
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 512Mi
+  storageClassName: ""
+  volumeName: orders-pv       # hint: this is how we manually bind to a specific PV

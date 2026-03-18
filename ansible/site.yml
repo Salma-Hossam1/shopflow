@@ -1,0 +1,45 @@
+---
+# site.yml — Full provisioning playbook.
+# Run this once on a fresh machine to go from zero to a running cluster.
+#
+# Usage:
+#   ansible-playbook site.yml
+#
+# With custom values:
+#   ansible-playbook site.yml \
+#     --extra-vars "docker_hub_username=myuser shopflow_image_tag=abc1234"
+#
+# With secrets from environment variables:
+#   JWT_SECRET=mysecret ansible-playbook site.yml
+
+- name: Provision and deploy ShopFlow
+  hosts: k8s_nodes
+  become: false   # individual tasks use become: yes where root is needed
+
+  roles:
+    - role: common      # 1. Base packages, swap off, kernel params
+    - role: docker      # 2. Install Docker Engine
+    - role: minikube    # 3. Install kubectl + Minikube, start cluster, create namespaces
+    - role: shopflow    # 4. Create K8s secrets, apply manifests, wait for rollout
+
+  post_tasks:
+    - name: Final pod status
+      command: kubectl get pods --namespace=shopflow-dev
+      register: final_pods
+      changed_when: false
+
+    - name: Show pods
+      debug:
+        msg: "{{ final_pods.stdout_lines }}"
+
+    - name: Get Minikube IP
+      command: minikube ip
+      register: minikube_ip
+      changed_when: false
+
+    - name: Show access info
+      debug:
+        msg:
+          - "Minikube IP: {{ minikube_ip.stdout }}"
+          - "Add to /etc/hosts: {{ minikube_ip.stdout }} shopflow.local"
+          - "Then access: http://shopflow.local/api/auth/health"

@@ -1,0 +1,9 @@
+---
+# Handlers run once at the end of the play, only when notified.
+# Even if 5 tasks notify "restart docker", it restarts only once.
+
+- name: restart docker
+  systemd:
+    name: docker
+    state: restarted
+  become: yes

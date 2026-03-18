@@ -1,0 +1,10 @@
+---
+# roles/docker/tasks/install_archlinux.yml
+
+- name: Install Docker (Arch Linux)
+  pacman:
+    name:
+      - docker
+      - docker-compose
+    state: present
+  become: yes

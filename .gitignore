@@ -1,0 +1,11 @@
+# Dependencies
+**/node_modules
+
+# Environment files with real values
+**/.env
+
+# Docker
+**/.dockerignore
+
+# OS
+.DS_Store

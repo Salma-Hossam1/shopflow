@@ -1,0 +1,226 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: auth-db-policy
+  namespace: shopflow-dev
+spec:
+  podSelector:
+    matchLabels:
+      app: auth-db
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: auth-service
+      ports:
+        - port: 5432
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: products-db-policy
+  namespace: shopflow-dev
+spec:
+  podSelector:
+    matchLabels:
+      app: products-db       
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: products-service  # who is allowed in?
+      ports:
+        - port: 5432     # which port?
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: orders-db-policy
+  namespace: shopflow-dev
+spec:
+  podSelector:
+    matchLabels:
+      app: orders-db         # which pod does this policy apply to?
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: orders-service  # who is allowed in?
+      ports:
+        - port: 5432     # which port?
+
+---
+# policies for services to talk to db , dns , ingress-controller (ingress-nginx-controller) and each other
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: auth-service-policy
+  namespace: shopflow-dev
+spec:
+  podSelector:
+    matchLabels:
+      app: auth-service    # this policy applies to auth-service pods
+
+  policyTypes:
+    - Ingress              # control who can send TO auth-service
+    - Egress               # control who auth-service can send TO
+
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/component: controller
+          # namespaceSelector — match by namespace, not pod label
+          # ingress-nginx is a different namespace so we can't use podSelector alone
+          # kubernetes.io/metadata.name is automatically set on every namespace
+      ports:
+        - port: 3001       # auth-service listens on 3001
+
+  egress:
+    # 1. allow auth-service to talk to auth-db
+    - to:
+        - podSelector:
+            matchLabels:
+              app: auth-db
+      ports:
+        - port: 5432       # Postgres port
+
+    # 2. allow DNS resolution — without this, "auth-db" can't be resolved to an IP
+    # every service needs this or pod-to-pod by name breaks completely
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 53
+          protocol: UDP    # DNS uses UDP by default
+        - port: 53
+          protocol: TCP    # DNS falls back to TCP for large responses
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: products-service-policy
+  namespace: shopflow-dev
+spec:
+  podSelector:
+    matchLabels:
+      app: products-service    # this policy applies to products-service pods
+
+  policyTypes:
+    - Ingress              # control who can send TO products-service
+    - Egress               # control who products-service can send TO
+
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/component: controller
+          # namespaceSelector — match by namespace, not pod label
+          # ingress-nginx is a different namespace so we can't use podSelector alone
+          # kubernetes.io/metadata.name is automatically set on every namespace
+      ports:
+        - port: 3002       # products-service listens on 3002
+
+    - from:
+        - podSelector:
+            matchLabels:
+              app: orders-service  # who is allowed in?
+      ports:
+        - port: 3002     # which port?
+
+  egress:
+    # 1. allow products-service to talk to products-db
+    - to:
+        - podSelector:
+            matchLabels:
+              app: products-db
+      ports:
+        - port: 5432       # Postgres port
+
+    # 2. allow DNS resolution — without this, "products-db" can't be resolved to an IP
+    # every service needs this or pod-to-pod by name breaks completely
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 53
+          protocol: UDP    # DNS uses UDP by default
+        - port: 53
+          protocol: TCP    # DNS falls back to TCP for large responses
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: orders-service-policy
+  namespace: shopflow-dev
+spec:
+  podSelector:
+    matchLabels:
+      app: orders-service    # this policy applies to orders-service pods
+
+  policyTypes:
+    - Ingress              # control who can send TO orders-service
+    - Egress               # control who orders-service can send TO
+
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/component: controller
+          # namespaceSelector — match by namespace, not pod label
+          # ingress-nginx is a different namespace so we can't use podSelector alone
+          # kubernetes.io/metadata.name is automatically set on every namespace
+      ports:
+        - port: 3003       # orders-service listens on 3003
+
+  egress:
+    # 1. allow orders-service to talk to orders-db
+    - to:
+        - podSelector:
+            matchLabels:
+              app: orders-db
+      ports:
+        - port: 5432       # Postgres port
+
+    #  allow orders-service to call products-service  
+    - to:
+        - podSelector:
+            matchLabels:
+              app: products-service
+      ports:
+        - port: 3002
+
+    # 2. allow DNS resolution — without this, "orders-db" can't be resolved to an IP
+    # every service needs this or pod-to-pod by name breaks completely
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+              
+      ports:
+        - port: 53
+          protocol: UDP    # DNS uses UDP by default
+        - port: 53
+          protocol: TCP    # DNS falls back to TCP for large responses
+
+    

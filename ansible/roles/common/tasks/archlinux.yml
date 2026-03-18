@@ -1,0 +1,16 @@
+---
+# roles/common/tasks/archlinux.yml
+# Called automatically when ansible_os_family == "Archlinux"
+
+- name: Install base packages (Arch Linux)
+  pacman:
+    name:
+      - curl
+      - wget
+      - git
+      - ca-certificates
+      - gnupg
+      - python-pip
+    state: present
+    update_cache: yes
+  become: yes
