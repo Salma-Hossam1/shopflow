@@ -60,7 +60,7 @@ pipeline {
 
     post {
         success {
-            echo "Pipeline succeeded — ShopFlow ${IMAGE_TAG} deployed to K8s"
+            echo "Pipeline succeeded — ShopFlow deployed to K8s"
         }
         failure {
             echo "Pipeline failed — check logs above"
