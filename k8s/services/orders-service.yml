@@ -24,7 +24,7 @@ spec:
 
       containers:
         - name: orders-service
-          image: salmahossam12/shopflow-orders-service:latest
+          image: $DOCKER_USER/shopflow-orders-service:$IMAGE_TAG
           ports:
             - containerPort: 3003
 

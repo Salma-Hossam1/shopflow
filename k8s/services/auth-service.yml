@@ -24,7 +24,7 @@ spec:
 
       containers:
         - name: auth-service
-          image: salmahossam12/shopflow-auth-service:latest
+          image: $DOCKER_USER/shopflow-auth-service:$IMAGE_TAG
           ports:
             - containerPort: 3001
 

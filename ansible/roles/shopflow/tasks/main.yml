@@ -1,0 +1,81 @@
+---
+- name: Create JWT secret
+  command: >
+    kubectl create secret generic jwt-secret
+    --from-literal=JWT_SECRET={{ lookup('env', 'JWT_SECRET') | default('dev_secret_change_in_prod') }}
+    --namespace=shopflow-dev
+    --dry-run=client -o yaml | kubectl apply -f -
+  no_log: true
+
+- name: Create DB password secrets
+  command: >
+    kubectl create secret generic {{ item.name }}-db-secret
+    --from-literal=DB_PASSWORD={{ item.password }}
+    --namespace=shopflow-dev
+    --dry-run=client -o yaml | kubectl apply -f -
+  no_log: true
+  loop:
+    - name: auth
+      password: "{{ lookup('env', 'AUTH_DB_PASSWORD') | default('authpassword') }}"
+    - name: products
+      password: "{{ lookup('env', 'PRODUCTS_DB_PASSWORD') | default('productspassword') }}"
+    - name: orders
+      password: "{{ lookup('env', 'ORDERS_DB_PASSWORD') | default('orderspassword') }}"
+
+- name: Apply RBAC manifests
+  command: kubectl apply -f {{ k8s_manifests_dir }}/rbac/ --namespace=shopflow-dev
+  changed_when: false
+
+- name: Apply storage manifests
+  command: kubectl apply -f {{ k8s_manifests_dir }}/storage/ --namespace=shopflow-dev
+  changed_when: false
+
+- name: Apply database Deployments and Services
+  command: kubectl apply -f {{ k8s_manifests_dir }}/databases/ --namespace=shopflow-dev
+  changed_when: false
+
+- name: Wait for databases to be ready
+  command: >
+    kubectl rollout status deployment/{{ item }}-db
+    --namespace=shopflow-dev
+    --timeout=120s
+  loop:
+    - auth
+    - products
+    - orders
+
+- name: Apply application Deployments and Services
+  shell: |
+    export IMAGE_TAG={{ shopflow_image_tag }}
+    export DOCKER_USER={{ docker_hub_username }}
+    for f in {{ k8s_manifests_dir }}/services/*.yml; do
+      envsubst < "$f" | kubectl apply -f - --namespace=shopflow-dev
+    done
+  changed_when: false
+
+- name: Apply NetworkPolicies
+  command: kubectl apply -f {{ k8s_manifests_dir }}/network-policies/ --namespace=shopflow-dev
+  changed_when: false
+
+- name: Apply Ingress
+  command: kubectl apply -f {{ k8s_manifests_dir }}/ingress/ --namespace=shopflow-dev
+  changed_when: false
+
+- name: Wait for all services to roll out
+  command: >
+    kubectl rollout status deployment/{{ item }}
+    --namespace=shopflow-dev
+    --timeout=120s
+  loop:
+    - auth-service
+    - products-service
+    - orders-service
+
+- name: Show all running pods
+  command: kubectl get pods --namespace=shopflow-dev -o wide
+  register: pods
+  changed_when: false
+
+- name: Print pods
+  debug:
+    msg: "{{ pods.stdout_lines }}"

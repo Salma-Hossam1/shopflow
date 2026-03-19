@@ -1,0 +1,69 @@
+---
+- name: Set CPU architecture variable
+  set_fact:
+    k8s_arch: >-
+      {{ 'arm64' if ansible_architecture == 'aarch64'
+         else 'amd64' }}
+
+# --- kubectl ---
+- name: Check if kubectl is already installed
+  command: kubectl version --client
+  register: kubectl_check
+  failed_when: false
+  changed_when: false
+
+- name: Download kubectl
+  get_url:
+    url: "https://dl.k8s.io/release/{{ kubectl_version }}/bin/linux/{{ k8s_arch }}/kubectl"
+    dest: /usr/local/bin/kubectl
+    mode: '0755'
+  become: yes
+  when: kubectl_check.rc != 0
+
+# --- Minikube ---
+- name: Check if Minikube is already installed
+  command: minikube version
+  register: minikube_check
+  failed_when: false
+  changed_when: false
+
+- name: Download Minikube
+  get_url:
+    url: "https://storage.googleapis.com/minikube/releases/{{ minikube_version }}/minikube-linux-{{ k8s_arch }}"
+    dest: /usr/local/bin/minikube
+    mode: '0755'
+  become: yes
+  when: minikube_check.rc != 0
+
+# --- Start cluster ---
+- name: Check if Minikube is running
+  command: minikube status --format='{{.Host}}'
+  register: minikube_status
+  failed_when: false
+  changed_when: false
+
+- name: Start Minikube
+  command: >
+    minikube start
+    --driver={{ minikube_driver }}
+    --cpus={{ minikube_cpus }}
+    --memory={{ minikube_memory }}
+    --addons=ingress
+  when: minikube_status.stdout != 'Running'
+
+- name: Enable ingress addon
+  command: minikube addons enable ingress
+  changed_when: false
+  failed_when: false
+
+- name: Verify cluster is reachable
+  command: kubectl cluster-info
+  changed_when: false
+
+# --- Namespaces ---
+- name: Create K8s namespaces
+  command: >
+    kubectl create namespace {{ item }}
+    --dry-run=client -o yaml | kubectl apply -f -
+  loop: "{{ k8s_namespaces }}"
+  changed_when: false
