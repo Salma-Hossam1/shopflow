@@ -68,9 +68,9 @@ pipeline {
         always {
             // clean up local Docker images to save disk space on Jenkins machine
             sh """
-                docker rmi ${DOCKER_USER}/shopflow-auth-service:${IMAGE_TAG} || true
-                docker rmi ${DOCKER_USER}/shopflow-products-service:${IMAGE_TAG} || true
-                docker rmi ${DOCKER_USER}/shopflow-orders-service:${IMAGE_TAG} || true
+                docker rmi salmahossam12/shopflow-auth-service:${IMAGE_TAG} || true
+                docker rmi salmahossam12/shopflow-products-service:${IMAGE_TAG} || true
+                docker rmi salmahossam12/shopflow-orders-service:${IMAGE_TAG} || true
             """
         }
     }
