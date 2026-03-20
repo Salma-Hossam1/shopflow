@@ -12,5 +12,6 @@ k8s_namespaces:
 docker_hub_username: "salmahossam12"
 shopflow_image_tag:  "latest"
 
-project_root:       "{{ playbook_dir }}/.."
-k8s_manifests_dir:  "{{ project_root }}/k8s"
+# project_root:       "{{ playbook_dir }}/.."
+# k8s_manifests_dir:  "{{ project_root }}/k8s"
+k8s_manifests_dir: "/home/salma/Documents/devOps-projects/shopflow/k8s"
