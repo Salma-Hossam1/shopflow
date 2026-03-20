@@ -1,6 +1,6 @@
 ---
 - name: Create JWT secret
-  command: >
+  shell: >
     kubectl create secret generic jwt-secret
     --from-literal=JWT_SECRET={{ lookup('env', 'JWT_SECRET') | default('dev_secret_change_in_prod') }}
     --namespace=shopflow-dev
@@ -8,7 +8,7 @@
   no_log: true
 
 - name: Create DB password secrets
-  command: >
+  shell: >
     kubectl create secret generic {{ item.name }}-db-secret
     --from-literal=DB_PASSWORD={{ item.password }}
     --namespace=shopflow-dev
