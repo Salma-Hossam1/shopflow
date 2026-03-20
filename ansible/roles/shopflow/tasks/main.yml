@@ -36,7 +36,7 @@
 
 - name: Wait for databases to be ready
   command: >
-    kubectl rollout status deployment/{{ item }}-db
+    kubectl rollout status deployment/{{ item }}-db-deployment
     --namespace=shopflow-dev
     --timeout=120s
   loop:
@@ -63,7 +63,7 @@
 
 - name: Wait for all services to roll out
   command: >
-    kubectl rollout status deployment/{{ item }}
+    kubectl rollout status deployment/{{ item }}-deployment
     --namespace=shopflow-dev
     --timeout=120s
   loop:
