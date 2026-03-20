@@ -42,14 +42,11 @@ pipeline {
 
         stage('Deploy') {
             steps {
-                withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
+                withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
                     sh """
-                        # export KUBECONFIG so kubectl and ansible know which cluster to talk to
-                        export KUBECONFIG=${KUBECONFIG}
-                        
-                        # run Ansible deploy playbook
-                        # passes image tag and docker username as extra vars
+                        export KUBECONFIG=${KUBECONFIG_FILE}
                         ansible-playbook ansible/deploy.yml \
+                            -i ansible/inventory/hosts.ini \
                             --extra-vars "shopflow_image_tag=${IMAGE_TAG}" \
                             --extra-vars "docker_hub_username=${DOCKER_USER}"
                     """
