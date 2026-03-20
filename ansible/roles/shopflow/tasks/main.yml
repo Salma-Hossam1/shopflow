@@ -1,4 +1,13 @@
 ---
+
+- name: Clone or pull latest repo on target machine
+  git:
+    repo: "{{ repo_url }}"
+    dest: "{{ repo_dest }}"
+    version: master
+    force: yes
+  become: no
+  
 - name: Create JWT secret
   shell: >
     kubectl create secret generic jwt-secret
