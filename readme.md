@@ -12,7 +12,7 @@ ShopFlow consists of three Node.js microservices — Auth, Products, and Orders 
 
 ### System Design
 
-![System Design Diagram](./systemdesign/shopflow_system_design.svg)
+/home/salma/Downloads/shopflow_system_design.svg
 
 > The diagram above shows the full pipeline: developer push → GitHub Actions → Jenkins (build/push/deploy) → Ansible SSH → kubectl → K8s cluster (Ingress → services → DBs) with Docker Hub as the image registry.
 
